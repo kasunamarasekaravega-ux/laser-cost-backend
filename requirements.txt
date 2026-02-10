@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+psycopg2
+gspread
+google-api-python-client
+google-auth
+python-dotenv
+ezdxf
