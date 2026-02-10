@@ -1,23 +1,18 @@
+import os
+import json
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-import os
+from google.oauth2.service_account import Credentials
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def get_drive_service():
-    if not os.path.exists("token.json"):
-        raise RuntimeError("token.json not found. Run: python auth_drive.py")
+    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    if not creds_json:
+        raise RuntimeError("Missing GOOGLE_CREDENTIALS_JSON env var for Drive")
 
-    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-
-    # refresh token if expired
-    if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        with open("token.json", "w") as f:
-            f.write(creds.to_json())
-
+    info = json.loads(creds_json)
+    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
     return build("drive", "v3", credentials=creds)
 
 def find_folder(service, folder_name, parent_id=None):
