@@ -1,15 +1,29 @@
-import gspread
+import os
+import json
 import time
+import gspread
 from google.oauth2.service_account import Credentials
 
-SERVICE_ACCOUNT_FILE = "credentials.json"
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
+    "https://www.googleapis.com/auth/drive",
 ]
 
 def get_gc():
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    """
+    Render-safe Google Sheets auth.
+    Expects service account JSON stored in env var GOOGLE_CREDENTIALS_JSON.
+    """
+    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    if not creds_json:
+        raise RuntimeError("Missing GOOGLE_CREDENTIALS_JSON environment variable")
+
+    try:
+        info = json.loads(creds_json)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"GOOGLE_CREDENTIALS_JSON is not valid JSON: {e}")
+
+    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
     return gspread.authorize(creds)
 
 def calculate_cost(spreadsheet_id: str, dashboard_tab: str, inputs: dict) -> str:
@@ -30,6 +44,8 @@ def calculate_cost(spreadsheet_id: str, dashboard_tab: str, inputs: dict) -> str
     ]
 
     sheet.batch_update(updates, value_input_option="USER_ENTERED")
+
+    # Give Sheets a moment to recalculate formulas
     time.sleep(2)
 
     return sheet.acell("C31").value or "0"
