@@ -8,7 +8,7 @@ DB_URL = os.getenv("SUPABASE_DB_URL")
 def get_conn():
     if not DB_URL:
         raise RuntimeError("SUPABASE_DB_URL missing in .env")
-    return psycopg2.connect(DB_URL)
+    return psycopg2.connect(DB_URL, sslmode="require")
 
 def get_department_id_by_name(department_name: str) -> str:
     conn = get_conn()
