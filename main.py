@@ -29,11 +29,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=False,   # ✅ CHANGE THIS
+    allow_origin_regex=".*",   # ✅ allow any origin during development
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -197,14 +194,7 @@ async def preview(
 
             tab_folder_name = safe_tab_folder_name(material_sheet, thickness_mm)
 
-            drive_folder_url, _ = upload_tab_files(
-                root_folder_name=DRIVE_ROOT,
-                department=department,
-                project=project,
-                job_folder_name=preview_job_folder,
-                tab_folder_name=tab_folder_name,
-                files=files_to_upload
-            )
+            drive_folder_url = None  # ✅ preview should not upload
 
             tab_results.append({
                 "material": material_sheet,
@@ -238,7 +228,14 @@ async def preview(
 # SUBMIT (Save to DB)
 # -------------------------
 @app.post("/submit")
-def submit(preview_result_json: dict):
+async def submit(
+    payload_json: str = Form(...),
+    files: list[UploadFile] = File([])
+):
+    try:
+        preview_result_json = json.loads(payload_json)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid payload_json: {e}")
 
     employee_email = preview_result_json.get("employee_email", "").strip()
     department_name = preview_result_json.get("department", "").strip()
@@ -266,7 +263,6 @@ def submit(preview_result_json: dict):
     )
 
     saved_tabs = []
-
     for t in tabs:
         tab_id = insert_job_tab(
             job_id=job_id,
@@ -278,13 +274,9 @@ def submit(preview_result_json: dict):
             quantity=t["quantity"],
             cost_text=t["cost_text"],
             cost_numeric=t["cost_numeric"],
-            drive_folder_url=t["drive_folder_url"]
+            drive_folder_url=t.get("drive_folder_url")
         )
-
-        saved_tabs.append({
-            "tab_id": tab_id,
-            "material": t["material"]
-        })
+        saved_tabs.append({"tab_id": tab_id, "material": t["material"]})
 
     return {
         "job_id": job_id,
